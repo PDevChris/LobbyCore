@@ -2,172 +2,152 @@
 
 namespace LC\ui;
 
-use pocketmine\command\Command;
 use pocketmine\player\Player;
-use pocketmine\Server;
-use pocketmine\utils\TextFormat as MG;
-
-use Vecnavium\FormsUI\Form;
-use Vecnavium\FormsUI\FormAPI;
 use Vecnavium\FormsUI\SimpleForm;
-
 use LC\LobbyCore;
 
 class UI {
 
-    public $plugin;
+    private LobbyCore $plugin;
 
-    public function __construct(){
+    public function __construct() {
         $this->plugin = LobbyCore::getInstance();
     }
 
-    public function getGames(Player $player){
-        $form = new SimpleForm(function(Player $player, int $data = null){
-            if($data === null){
-                return true;
-            }
-            switch($data){
+    /**
+     * Server selector (Boarding Ticket)
+     */
+    public function getGames(Player $player): void {
+        $form = new SimpleForm(function (Player $player, ?int $data) {
+            if ($data === null) return;
+
+            switch ($data) {
                 case 0:
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, $this->plugin->getConfig()->get("CommandForm1"));
+                    $player->sendMessage("Teleporting to UHC Solos...");
+                    // Add your server transfer code here
                     break;
                 case 1:
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, $this->plugin->getConfig()->get("CommandForm2"));
+                    $player->sendMessage("Teleporting to UHC Clans...");
                     break;
                 case 2:
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, $this->plugin->getConfig()->get("CommandForm3"));
+                    $player->sendMessage("Teleporting to F1 Racing...");
+                    break;
+            }
+        });
+
+        $form->setTitle("§bSelect a Game");
+        $form->setContent("Choose the game you want to play:");
+        $form->addButton("UHC Solos");
+        $form->addButton("UHC Clans");
+        $form->addButton("F1 Racing");
+
+        $player->sendForm($form);
+    }
+
+    /**
+     * Staff menu (Airport Staff)
+     */
+    public function getStaffMenu(Player $player): void {
+        if (!$player->hasPermission("lobbycore.staff")) {
+            $player->sendMessage("§cYou do not have permission to access this menu.");
+            return;
+        }
+
+        $form = new SimpleForm(function (Player $player, ?int $data) {
+            if ($data === null) return;
+            // Add staff actions here
+            $player->sendMessage("Selected staff option: " . $data);
+        });
+
+        $form->setTitle("§5Staff Menu");
+        $form->setContent("Choose an action:");
+        $form->addButton("Manage Players");
+        $form->addButton("Teleport to Event");
+        $form->addButton("Settings");
+
+        $player->sendForm($form);
+    }
+
+    /**
+     * Cosmetics menu (Luggage)
+     */
+    public function getCosmetics(Player $player): void {
+        $form = new SimpleForm(function (Player $player, ?int $data) {
+            if ($data === null) return;
+            switch ($data) {
+                case 0:
+                    $player->sendMessage("Opening Costumes...");
+                    break;
+                case 1:
+                    $player->sendMessage("Opening Trails...");
+                    break;
+                case 2:
+                    $player->sendMessage("Opening Titles...");
                     break;
                 case 3:
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, $this->plugin->getConfig()->get("CommandForm4"));
-                    break;
-                case 4:
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, $this->plugin->getConfig()->get("CommandForm5"));
-                    break;
-                case 5:
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, $this->plugin->getConfig()->get("CommandForm6"));
+                    $player->sendMessage("Opening Pets...");
                     break;
             }
         });
-        $form->setTitle(MG::RED . $this->plugin->getConfig()->get("GameTitle"));
-        $form->setContent(MG::RED . $this->plugin->getConfig()->get("GameInfo"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("GameForm1"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("GameForm2"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("GameForm3"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("GameForm4"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("GameForm5"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("GameForm6"));
-        $form->addButton("§cEXIT");
-        $form->sendToPlayer($player);
+
+        $form->setTitle("§bCosmetics");
+        $form->setContent("Select a category:");
+        $form->addButton("Costumes");
+        $form->addButton("Trails");
+        $form->addButton("Titles");
+        $form->addButton("Pets");
+
+        $player->sendForm($form);
     }
 
-    public function getCosmetics(Player $player){
-        $form = new SimpleForm(function(Player $player, int $data = null){
-            if($data === null){
-                return true;
-            }
-            switch($data){
-                case 0:
-                    if (!$player->hasPermission("lobbycore.use.fly")) {
-                        $player->sendMessage("You not have permissions to use this command");
-                    } else {
-                        $this->FlyForm($player);
-                    }
-                break;
-                case 1:
-                    if (!$player->hasPermission("lobbycore.use.size")) {
-                        $player->sendMessage("You not have permissions to use this command");
-                    } else {
-                        $this->SizeForm($player);
-                    }
-                break;
-                case 2;
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, "nick");
-                break;
-                case 3;
-                    $this->plugin->getServer()->getCommandMap()->dispatch($player, "cape");
-                break;
-                case 4;
-                    
-                break;
-            }
+    /**
+     * Shop menu (Access Card)
+     */
+    public function getShop(Player $player): void {
+        $form = new SimpleForm(function (Player $player, ?int $data) {
+            if ($data === null) return;
+            // Add shop actions here
+            $player->sendMessage("Selected shop option: " . $data);
         });
-        $form->setTitle(MG::YELLOW . $this->plugin->getConfig()->get("CosmeticTitle"));
-        $form->setContent(MG::RED . $this->plugin->getConfig()->get("CosmeticInfo"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("CosmeticForm1"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("CosmeticForm2"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("CosmeticForm3"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("CosmeticForm4"));
-        $form->addButton("§cEXIT");
-        $form->sendToPlayer($player);
+
+        $form->setTitle("§aLobby Shop");
+        $form->setContent("Purchase items and upgrades here:");
+        $form->addButton("Coins");
+        $form->addButton("Upgrades");
+        $form->addButton("Misc");
+
+        $player->sendForm($form);
     }
 
-    public function FlyForm(Player $player){
-        $form = new SimpleForm(function(Player $player, int $data = null){
-            if($data === null){
-                return true;
-            }
-            switch($data){
+    /**
+     * Profile / Friends / Inbox (Phone)
+     */
+    public function getProfile(Player $player): void {
+        $form = new SimpleForm(function (Player $player, ?int $data) {
+            if ($data === null) return;
+            switch ($data) {
                 case 0:
-                    $player->setFlying(true);
-                    $player->setAllowFlight(true);
-                    $player->sendMessage(MG::GREEN . $this->plugin->getConfig()->get("FlyMessageTrue"));
+                    $player->sendMessage("Opening Profile...");
                     break;
                 case 1:
-                    $player->setFlying(false);
-                    $player->setAllowFlight(false);
-                    $player->sendMessage(MG::RED . $this->plugin->getConfig()->get("FlyMessageFalse"));
-                    break;
-            }
-        });
-        $form->setTitle(MG::BLUE . $this->plugin->getConfig()->get("FlyTitle"));
-        $form->setContent(MG::GRAY . $this->plugin->getConfig()->get("FlyInfo"));
-        $form->addButton(MG::GREEN . $this->plugin->getConfig()->get("FlyForm1"));
-        $form->addButton(MG::RED . $this->plugin->getConfig()->get("FlyForm2"));
-        $form->addButton("§cEXIT");
-        $form->sendToPlayer($player);
-    }
-
-    public function SizeForm(Player $player){
-        $form = new SimpleForm(function(Player $player, int $data = null){
-            if($data === null){
-                return true;
-            }
-            switch($data){
-                case 0:
-                    $player->setScale("1.0");
-                    $player->sendMessage(MG::GREEN . $this->plugin->getConfig()->get("SizeMessageNormal"));
-                    break;
-                case 1:
-                    $player->setScale("1.5");
-                    $player->sendMessage(MG::GREEN . $this->plugin->getConfig()->get("SizeMessageMedium"));
+                    $player->sendMessage("Opening Friends List...");
                     break;
                 case 2:
-                    $player->setScale("2.0");
-                    $player->sendMessage(MG::GREEN . $this->plugin->getConfig()->get("SizeMessageBig"));
+                    $player->sendMessage("Opening Inbox...");
+                    break;
+                case 3:
+                    $player->sendMessage("Opening Experience...");
                     break;
             }
         });
-        $form->setTitle(MG::BLUE . $this->plugin->getConfig()->get("SizeTitle"));
-        $form->setContent(MG::GRAY . $this->plugin->getConfig()->get("SizeInfo"));
-        $form->addButton(MG::GREEN . $this->plugin->getConfig()->get("SizeForm1"));
-        $form->addButton(MG::GREEN . $this->plugin->getConfig()->get("SizeForm2"));
-        $form->addButton(MG::GREEN . $this->plugin->getConfig()->get("SizeForm3"));
-        $form->addButton("§cEXIT");
-        $form->sendToPlayer($player);
-    }
 
-    public function getInfo(Player $player){
-        $form = new SimpleForm(function(Player $player, int $data = null){
-            if($data === null){
-                return true;
-            }
-            switch($data){
-                case 0:
-                    break;
-            }
-        });
-        $form->setTitle(MG::BLUE .$this->plugin->getConfig()->get("InfoTitle"));
-        $form->setContent(MG::RED . $this->plugin->getConfig()->get("Info"));
-        $form->addButton("§cEXIT");
-        $form->sendToPlayer($player);
+        $form->setTitle("§dYour Phone");
+        $form->setContent("Select an option:");
+        $form->addButton("Profile");
+        $form->addButton("Friends");
+        $form->addButton("Inbox");
+        $form->addButton("Experience");
+
+        $player->sendForm($form);
     }
 }
