@@ -3,62 +3,74 @@
 namespace LC\ui;
 
 use pocketmine\player\Player;
+use pocketmine\item\VanillaItems;
+use pocketmine\item\Item;
+use pocketmine\utils\Config;
+use pocketmine\Server;
+use pocketmine\utils\Config;
+use pocketmine\Server;
+use pocketmine\entity\effect\VanillaEffects;
+use pocketmine\entity\effect\EffectInstance;
 use Vecnavium\FormsUI\SimpleForm;
 use LC\LobbyCore;
 
 class UI {
 
     private LobbyCore $plugin;
+    private Config $perkData;
+
 
     public function __construct() {
         $this->plugin = LobbyCore::getInstance();
+
+          @mkdir($this->plugin->getDataFolder());
+            $this->perkData = new Config(
+                $this->plugin->getDataFolder() . "temp_perks.yml",
+                Config::YAML
+            );
     }
 
-    /**
-     * Server selector (Boarding Ticket)
-     */
+    /* =========================
+     * SERVER SELECTOR
+     * ========================= */
     public function getGames(Player $player): void {
-    $form = new SimpleForm(function (Player $player, ?int $data) {
-        if ($data === null) return;
+        $form = new SimpleForm(function (Player $player, ?int $data) {
+            if ($data === null) return;
 
             switch ($data) {
                 case 0:
-                    $player->sendMessage("§aSucessfully Boarding to Miami, Flordia...");
+                    $player->sendMessage("§aSuccessfully boarding to Miami, Florida...");
                     break;
                 case 1:
-                    $player->sendMessage("§aSucessfully Boarding to Tokyo, Japan...");
+                    $player->sendMessage("§aSuccessfully boarding to Tokyo, Japan...");
                     break;
             }
         });
-    
+
         $form->setTitle("§6§lDepartures");
-        $form->setContent("§eSelect your desired location. Each button shows the city you'll travel to:");
-    
-        // Buttons with images and labels
-        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/a/HlRUICl"); // Miami
-        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/a/RgIyerv"); // Tokyo
-    
+        $form->setContent("§eSelect your destination:");
+
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/a/HlRUICl");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/a/RgIyerv");
+
         $player->sendForm($form);
     }
 
-
-    /**
-     * Staff menu (Airport Staff)
-     */
+    /* =========================
+     * STAFF MENU
+     * ========================= */
     public function getStaffMenu(Player $player): void {
         if (!$player->hasPermission("lobbycore.staff")) {
-            $player->sendMessage("§cYou do not have permission to access this menu.");
+            $player->sendMessage("§cNo permission.");
             return;
         }
 
-        $form = new SimpleForm(function (Player $player, ?int $data) {
+        $form = new SimpleForm(function(Player $player, ?int $data){
             if ($data === null) return;
-            // Add staff actions here
-            $player->sendMessage("Selected staff option: " . $data);
+            $player->sendMessage("Selected option: $data");
         });
 
         $form->setTitle("§5Staff Menu");
-        $form->setContent("Choose an action:");
         $form->addButton("Manage Players");
         $form->addButton("Teleport to Event");
         $form->addButton("Settings");
@@ -66,185 +78,211 @@ class UI {
         $player->sendForm($form);
     }
 
-    /**
-     * Cosmetics menu (Luggage)
-     */
-   public function getCosmetics(Player $player): void {
-    $form = new SimpleForm(function (Player $player, ?int $data) {
-        if ($data === null) return;
-
-        switch ($data) {
-            case 0:
-                $player->sendMessage("§bOpening Costumes menu...");
-                // Implement Costume menu later
-                break;
-            case 1:
-                $player->sendMessage("§bOpening Trails menu...");
-                // Implement Trails menu later
-                break;
-            case 2:
-                $player->sendMessage("§bOpening Titles menu...");
-                // Implement Titles menu later
-                break;
-            case 3:
-                $player->sendMessage("§bOpening Pets menu...");
-                // Open the Pets plugin menu
-                $player->getServer()->dispatchCommand($player, "pets");
-                break;
-        }
-    });
-
-    $form->setTitle("§l§6Your Luggage");
-    $form->setContent("§eSelect a category:");
-
-    // Buttons with text titles
-    $form->addButton("§bYour Costumes");
-    $form->addButton("§bYour Trails");
-    $form->addButton("§bYour Titles");
-    $form->addButton("§bYour Pets");
-
-    $player->sendForm($form);
-}
-
-public function getAccessCard(Player $player): void {
-    $form = new SimpleForm(function (Player $player, ?int $data) {
-        if ($data === null) return;
-
-        switch ($data) {
-            // Online shops
-            case 0: $this->getOnlineShop($player, "Costume Boutique"); break;
-            case 1: $this->getOnlineShop($player, "Trail Studio"); break;
-            case 2: $this->getOnlineShop($player, "Pet Emporium"); break;
-
-            // Walk-to / in-person shops
-            case 3: $this->getInPersonShop($player, "Witchs Hut"); break;
-            case 4: $this->getInPersonShop($player, "Shift & Sip"); break;
-            case 5: $this->getInPersonShop($player, "Skyline Sushi"); break;
-            case 6: $this->getInPersonShop($player, "El Taqueria"); break;
-            case 7: $this->getInPersonShop($player, "Leaderboard Lounge"); break;
-        }
-    });
-
-    $form->setTitle("§6Access Card");
-    $form->setContent("Tap a shop to go there:");
-
-    // Buttons with images for visual appeal
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "hhttps://imgur.com/WGc1aZZ"); // Costume Boutique
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/NQsaNBR");   // Trail Studio
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/mq8Okkf");     // Pet Emporium
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/jTwZnDQ");  // Potion Station
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/Lk0jkFK");  // Coffee Corner
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/SNU2jTL");  // Snack Noodle Bar
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/vIFHD2N");    // Taco Stand
-    $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/5IrK9Wp");  // Leaderboard Lounge
-
-    $player->sendForm($form);
-}
-
-    public function getInPersonShop(Player $player, string $shopName): void {
-    $form = new SimpleForm(function (Player $player, ?int $data) use ($shopName) {
-        if ($data === null) return;
-
-        switch ($shopName) {
-            case "Witchs Hut":
-                $player->sendMessage("§aYou received a potion effect! (later: choose effect & duration)");
-                break;
-
-            case "Shift & Sip":
-                switch($data){
-                    case 0: $player->sendMessage("§6You selected Americano!"); break;
-                    case 1: $player->sendMessage("§6You selected Espresso!"); break;
-                    case 2: $player->sendMessage("§6You selected Latte!"); break;
-                    case 3: $player->sendMessage("§6You selected Cappuccino!"); break;
-                }
-                break;
-
-            case "Skyline Sushi":
-                switch($data){
-                    case 0: $player->sendMessage("§6You selected Ramen!"); break;
-                    case 1: $player->sendMessage("§6You selected Udon!"); break;
-                    case 2: $player->sendMessage("§6You selected Dumplings!"); break;
-                    case 3: $player->sendMessage("§6You selected Sushi!"); break;
-                }
-                break;
-
-            case "El Taqueria":
-                switch($data){
-                    case 0: $player->sendMessage("§6You selected Beef Taco!"); break;
-                    case 1: $player->sendMessage("§6You selected Chicken Taco!"); break;
-                    case 2: $player->sendMessage("§6You selected Veggie Taco!"); break;
-                    case 3: $player->sendMessage("§6You selected Fish Taco!"); break;
-                }
-                break;
-        }
-    });
-
-    $form->setTitle("§6" . $shopName);
-
-    // Text buttons instead of images
-    switch($shopName){
-        case "Witchs Hut":
-            $form->setContent("Tap to receive a potion effect:");
-            $form->addButton("Get Random Potion Effect");
-            break;
-
-        case "Shift & Sip":
-            $form->setContent("Select your coffee:");
-            $form->addButton("Americano");
-            $form->addButton("Espresso");
-            $form->addButton("Latte");
-            $form->addButton("Cappuccino");
-            break;
-
-        case "Skyline Sushi":
-            $form->setContent("Select your dish:");
-            $form->addButton("Ramen");
-            $form->addButton("Udon");
-            $form->addButton("Dumplings");
-            $form->addButton("Sushi");
-            break;
-
-        case "El Taqueria":
-            $form->setContent("Select your taco:");
-            $form->addButton("Beef Taco");
-            $form->addButton("Chicken Taco");
-            $form->addButton("Veggie Taco");
-            $form->addButton("Fish Taco");
-            break;
-    }
-
-    $player->sendForm($form);
-}
-
-
-
-    public function getProfile(Player $player): void {
-        $form = new SimpleForm(function (Player $player, ?int $data) {
+    /* =========================
+     * COSMETICS MENU
+     * ========================= */
+    public function getCosmetics(Player $player): void {
+        $form = new SimpleForm(function(Player $player, ?int $data){
             if ($data === null) return;
+
             switch ($data) {
-                case 0:
-                    $player->sendMessage("Opening Profile...");
-                    break;
-                case 1:
-                    $player->sendMessage("Opening Friends List...");
-                    break;
-                case 2:
-                    $player->sendMessage("Opening Inbox...");
-                    break;
+                case 0: $player->sendMessage("Opening Costumes..."); break;
+                case 1: $player->sendMessage("Opening Trails..."); break;
+                case 2: $player->sendMessage("Opening Titles..."); break;
                 case 3:
-                    $player->sendMessage("Opening Experience...");
+                    $player->getServer()->dispatchCommand($player, "pets");
                     break;
             }
         });
 
-        $form->setTitle("§dYour Phone");
-        $form->setContent("Select an option:");
-        $form->addButton("Profile");
-        $form->addButton("Friends");
-        $form->addButton("Inbox");
-        $form->addButton("Experience");
+        $form->setTitle("§6§lYour Luggage");
+        $form->addButton("Your Costumes");
+        $form->addButton("Your Trails");
+        $form->addButton("Your Titles");
+        $form->addButton("Your Pets");
 
         $player->sendForm($form);
     }
+
+    /* =========================
+     * ACCESS CARD
+     * ========================= */
+    public function getAccessCard(Player $player): void {
+        $form = new SimpleForm(function(Player $player, ?int $data){
+            if ($data === null) return;
+
+            switch ($data) {
+                case 0: $this->getOnlineShop($player, "Costume Boutique"); break;
+                case 1: $this->getOnlineShop($player, "Trail Studio"); break;
+                case 2: $this->getOnlineShop($player, "Pet Emporium"); break;
+                case 3: $this->getInPersonShop($player, "Witchs Hut"); break;
+                case 4: $this->getInPersonShop($player, "Shift & Sip"); break;
+                case 5: $this->getInPersonShop($player, "Skyline Sushi"); break;
+                case 6: $this->getInPersonShop($player, "El Taqueria"); break;
+                case 7: $this->getInPersonShop($player, "Leaderboard Lounge"); break;
+            }
+        });
+
+        $form->setTitle("§6Access Card");
+
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "hhttps://imgur.com/WGc1aZZ");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/NQsaNBR");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/mq8Okkf");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/jTwZnDQ");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/Lk0jkFK");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/SNU2jTL");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/vIFHD2N");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/5IrK9Wp");
+
+        $player->sendForm($form);
+    }
+
+    /* =========================
+     * IN-PERSON SHOPS
+     * ========================= */
+    public function getInPersonShop(Player $player, string $shop): void {
+        $form = new SimpleForm(function(Player $player, ?int $data) use ($shop){
+            if ($data === null) return;
+
+            switch ($shop) {
+                case "Shift & Sip":
+                    $this->giveFood($player, "Americano");
+                    break;
+
+                case "Skyline Sushi":
+                    $this->giveFood($player, "Ramen Bowl");
+                    break;
+
+                case "El Taqueria":
+                    $this->giveFood($player, "Beef Taco");
+                    break;
+
+                case "Witchs Hut":
+                    $this->spinWitchWheel($player);
+                    break;
+            }
+        });
+
+        $form->setTitle("§6$shop");
+
+        if ($shop === "Witchs Hut") {
+            $form->setContent("Spin the wheel for a random reward");
+            $form->addButton("Spin Wheel");
+        } else {
+            $form->setContent("Select item");
+            $form->addButton("Receive Item");
+        }
+
+        $player->sendForm($form);
+    }
+
+    /* =========================
+     * FOOD GIVER
+     * ========================= */
+    private function giveFood(Player $player, string $name): void {
+        $item = VanillaItems::BREAD();
+        $item->setCustomName("§r§f$name");
+        $player->getInventory()->addItem($item);
+        $player->sendMessage("§aYou received $name");
+    }
+
+    /* =========================
+     * WITCH WHEEL
+     * ========================= */
+    private function spinWitchWheel(Player $player): void {
+    $name = strtolower($player->getName());
+    $today = date("Y-m-d");
+
+    $data = $this->perkData->get($name, [
+        "last_spin" => "",
+        "perks" => []
+    ]);
+
+    /* DAILY LIMIT CHECK */
+    if ($data["last_spin"] === $today) {
+        $player->sendMessage("§cYou already spun the wheel today.");
+        return;
+    }
+
+    $data["last_spin"] = $today;
+
+    $roll = mt_rand(1, 100);
+    $now = time();
+
+    /* COMMON – EFFECT */
+    if ($roll <= 60) {
+        $expires = $now + (60 * 60); // 1 hour
+        $data["perks"]["speed"] = $expires;
+
+        $player->sendMessage("§aSpeed boost unlocked for 1 hour");
+
+    /* UNCOMMON – TEMP COSMETIC */
+    } elseif ($roll <= 85) {
+        $expires = $now + (24 * 60 * 60); // 1 day
+        $data["perks"]["temp_cosmetic"] = $expires;
+
+        $player->sendMessage("§bTemporary cosmetic unlocked for today");
+
+    /* RARE – TEMP PET ACCESS */
+    } else {
+        $expires = $now + (24 * 60 * 60); // 1 day
+        $data["perks"]["temp_pet"] = $expires;
+
+        $player->sendMessage("§dTemporary pet access unlocked for today");
+    }
+
+    $this->perkData->set($name, $data);
+    $this->perkData->save();
+
+    $this->applyActivePerks($player);
 }
 
+    public function applyActivePerks(Player $player): void {
+    $name = strtolower($player->getName());
+    $data = $this->perkData->get($name);
+
+    if (!$data || empty($data["perks"])) return;
+
+    $now = time();
+    $changed = false;
+
+    foreach ($data["perks"] as $perk => $expires) {
+        if ($expires <= $now) {
+            unset($data["perks"][$perk]);
+            $changed = true;
+            continue;
+        }
+
+        switch ($perk) {
+            case "speed":
+                $player->getEffects()->add(
+                    new EffectInstance(VanillaEffects::SPEED(), 20 * 60, 1)
+                );
+                break;
+
+            case "temp_pet":
+                // Example: allow pet command temporarily
+                // Hook this into your pet plugin later
+                break;
+
+            case "temp_cosmetic":
+                // Hook into costume/trail systems later
+                break;
+        }
+    }
+
+    if ($changed) {
+        $this->perkData->set($name, $data);
+        $this->perkData->save();
+    }
+}
+
+
+
+    /* =========================
+     * PLACEHOLDER ONLINE SHOP
+     * ========================= */
+    private function getOnlineShop(Player $player, string $name): void {
+        $player->sendMessage("§e$name coming soon");
+    }
+}
