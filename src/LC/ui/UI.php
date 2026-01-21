@@ -4,13 +4,9 @@ namespace LC\ui;
 
 use pocketmine\player\Player;
 use pocketmine\item\VanillaItems;
-use pocketmine\item\Item;
-use pocketmine\utils\Config;
-use pocketmine\Server;
-use pocketmine\utils\Config;
-use pocketmine\Server;
 use pocketmine\entity\effect\VanillaEffects;
 use pocketmine\entity\effect\EffectInstance;
+use pocketmine\utils\Config;
 use Vecnavium\FormsUI\SimpleForm;
 use LC\LobbyCore;
 
@@ -19,15 +15,14 @@ class UI {
     private LobbyCore $plugin;
     private Config $perkData;
 
-
     public function __construct() {
         $this->plugin = LobbyCore::getInstance();
 
-          @mkdir($this->plugin->getDataFolder());
-            $this->perkData = new Config(
-                $this->plugin->getDataFolder() . "temp_perks.yml",
-                Config::YAML
-            );
+        @mkdir($this->plugin->getDataFolder());
+        $this->perkData = new Config(
+            $this->plugin->getDataFolder() . "temp_perks.yml",
+            Config::YAML
+        );
     }
 
     /* =========================
@@ -39,17 +34,16 @@ class UI {
 
             switch ($data) {
                 case 0:
-                    $player->sendMessage("§aSuccessfully boarding to Miami, Florida...");
+                    $player->sendMessage("Successfully boarding to Miami, Florida...");
                     break;
                 case 1:
-                    $player->sendMessage("§aSuccessfully boarding to Tokyo, Japan...");
+                    $player->sendMessage("Successfully boarding to Tokyo, Japan...");
                     break;
             }
         });
 
-        $form->setTitle("§6§lDepartures");
-        $form->setContent("§eSelect your destination:");
-
+        $form->setTitle("Departures");
+        $form->setContent("Select your destination:");
         $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/a/HlRUICl");
         $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/a/RgIyerv");
 
@@ -61,7 +55,7 @@ class UI {
      * ========================= */
     public function getStaffMenu(Player $player): void {
         if (!$player->hasPermission("lobbycore.staff")) {
-            $player->sendMessage("§cNo permission.");
+            $player->sendMessage("No permission.");
             return;
         }
 
@@ -70,7 +64,7 @@ class UI {
             $player->sendMessage("Selected option: $data");
         });
 
-        $form->setTitle("§5Staff Menu");
+        $form->setTitle("Staff Menu");
         $form->addButton("Manage Players");
         $form->addButton("Teleport to Event");
         $form->addButton("Settings");
@@ -95,7 +89,7 @@ class UI {
             }
         });
 
-        $form->setTitle("§6§lYour Luggage");
+        $form->setTitle("Your Luggage");
         $form->addButton("Your Costumes");
         $form->addButton("Your Trails");
         $form->addButton("Your Titles");
@@ -123,9 +117,9 @@ class UI {
             }
         });
 
-        $form->setTitle("§6Access Card");
+        $form->setTitle("Access Card");
 
-        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "hhttps://imgur.com/WGc1aZZ");
+        $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/WGc1aZZ");
         $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/NQsaNBR");
         $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/mq8Okkf");
         $form->addButton("", SimpleForm::IMAGE_TYPE_URL, "https://imgur.com/jTwZnDQ");
@@ -163,7 +157,7 @@ class UI {
             }
         });
 
-        $form->setTitle("§6$shop");
+        $form->setTitle($shop);
 
         if ($shop === "Witchs Hut") {
             $form->setContent("Spin the wheel for a random reward");
@@ -181,108 +175,91 @@ class UI {
      * ========================= */
     private function giveFood(Player $player, string $name): void {
         $item = VanillaItems::BREAD();
-        $item->setCustomName("§r§f$name");
+        $item->setCustomName($name);
         $player->getInventory()->addItem($item);
-        $player->sendMessage("§aYou received $name");
+        $player->sendMessage("You received $name");
     }
 
     /* =========================
      * WITCH WHEEL
      * ========================= */
     private function spinWitchWheel(Player $player): void {
-    $name = strtolower($player->getName());
-    $today = date("Y-m-d");
+        $name = strtolower($player->getName());
+        $today = date("Y-m-d");
 
-    $data = $this->perkData->get($name, [
-        "last_spin" => "",
-        "perks" => []
-    ]);
+        $data = $this->perkData->get($name, [
+            "last_spin" => "",
+            "perks" => []
+        ]);
 
-    /* DAILY LIMIT CHECK */
-    if ($data["last_spin"] === $today) {
-        $player->sendMessage("§cYou already spun the wheel today.");
-        return;
-    }
-
-    $data["last_spin"] = $today;
-
-    $roll = mt_rand(1, 100);
-    $now = time();
-
-    /* COMMON – EFFECT */
-    if ($roll <= 60) {
-        $expires = $now + (60 * 60); // 1 hour
-        $data["perks"]["speed"] = $expires;
-
-        $player->sendMessage("§aSpeed boost unlocked for 1 hour");
-
-    /* UNCOMMON – TEMP COSMETIC */
-    } elseif ($roll <= 85) {
-        $expires = $now + (24 * 60 * 60); // 1 day
-        $data["perks"]["temp_cosmetic"] = $expires;
-
-        $player->sendMessage("§bTemporary cosmetic unlocked for today");
-
-    /* RARE – TEMP PET ACCESS */
-    } else {
-        $expires = $now + (24 * 60 * 60); // 1 day
-        $data["perks"]["temp_pet"] = $expires;
-
-        $player->sendMessage("§dTemporary pet access unlocked for today");
-    }
-
-    $this->perkData->set($name, $data);
-    $this->perkData->save();
-
-    $this->applyActivePerks($player);
-}
-
-    public function applyActivePerks(Player $player): void {
-    $name = strtolower($player->getName());
-    $data = $this->perkData->get($name);
-
-    if (!$data || empty($data["perks"])) return;
-
-    $now = time();
-    $changed = false;
-
-    foreach ($data["perks"] as $perk => $expires) {
-        if ($expires <= $now) {
-            unset($data["perks"][$perk]);
-            $changed = true;
-            continue;
+        if ($data["last_spin"] === $today) {
+            $player->sendMessage("You already spun the wheel today.");
+            return;
         }
 
-        switch ($perk) {
-            case "speed":
-                $player->getEffects()->add(
-                    new EffectInstance(VanillaEffects::SPEED(), 20 * 60, 1)
-                );
-                break;
+        $data["last_spin"] = $today;
+        $roll = mt_rand(1, 100);
+        $now = time();
 
-            case "temp_pet":
-                // Example: allow pet command temporarily
-                // Hook this into your pet plugin later
-                break;
-
-            case "temp_cosmetic":
-                // Hook into costume/trail systems later
-                break;
+        if ($roll <= 60) {
+            $expires = $now + 3600; // 1 hour
+            $data["perks"]["speed"] = $expires;
+            $player->sendMessage("Speed boost unlocked for 1 hour");
+        } elseif ($roll <= 85) {
+            $expires = $now + 86400; // 1 day
+            $data["perks"]["temp_cosmetic"] = $expires;
+            $player->sendMessage("Temporary cosmetic unlocked for today");
+        } else {
+            $expires = $now + 86400; // 1 day
+            $data["perks"]["temp_pet"] = $expires;
+            $player->sendMessage("Temporary pet access unlocked for today");
         }
-    }
 
-    if ($changed) {
         $this->perkData->set($name, $data);
         $this->perkData->save();
+        $this->applyActivePerks($player);
     }
-}
-
-
 
     /* =========================
-     * PLACEHOLDER ONLINE SHOP
+     * APPLY ACTIVE PERKS
+     * ========================= */
+    public function applyActivePerks(Player $player): void {
+        $name = strtolower($player->getName());
+        $data = $this->perkData->get($name, ["perks" => []]);
+
+        if (empty($data["perks"])) return;
+
+        $now = time();
+        $changed = false;
+
+        foreach ($data["perks"] as $perk => $expires) {
+            if ($expires <= $now) {
+                unset($data["perks"][$perk]);
+                $changed = true;
+                continue;
+            }
+
+            switch ($perk) {
+                case "speed":
+                    $player->getEffects()->add(new EffectInstance(VanillaEffects::SPEED(), 1200, 1));
+                    break;
+                case "temp_pet":
+                case "temp_cosmetic":
+                    // Hook into pet / costume / trail systems later
+                    break;
+            }
+        }
+
+        if ($changed) {
+            $this->perkData->set($name, $data);
+            $this->perkData->save();
+        }
+    }
+
+    /* =========================
+     * ONLINE SHOP PLACEHOLDER
      * ========================= */
     private function getOnlineShop(Player $player, string $name): void {
-        $player->sendMessage("§e$name coming soon");
+        $player->sendMessage("$name coming soon");
     }
 }
