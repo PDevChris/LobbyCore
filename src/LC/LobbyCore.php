@@ -3,41 +3,25 @@
 namespace LC;
 
 use pocketmine\plugin\PluginBase;
+use pocketmine\player\Player;
 use pocketmine\event\Listener;
 use pocketmine\utils\Config;
-use pocketmine\Server;
+use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\world\Position;
 use mysqli;
-
-// Events
+use LC\ui\UI;
 use LC\event\EventListener;
 use LC\event\Protection;
-
-// Commands
-use LC\commands\HubCommand;
-use LC\commands\ItemCommand;
-
-// UI
-use LC\ui\UI;
-
-// Storage
-use LC\storage\DataProvider;
-use LC\storage\YamlProvider;
-use LC\storage\MysqlProvider;
 
 class LobbyCore extends PluginBase implements Listener {
 
     private static LobbyCore $instance;
+    private Config $perkData;
+    private Config $coinsData;
+    private Config $dailyLimits;
 
-    private Config $config;
     private ?mysqli $db = null;
-    private DataProvider $provider;
-
-    /* -------------------- CORE -------------------- */
-
-    public static function getInstance(): LobbyCore {
-        return self::$instance;
-    }
+    private bool $usingMySQL = false;
 
     public function onLoad(): void {
         self::$instance = $this;
@@ -46,96 +30,129 @@ class LobbyCore extends PluginBase implements Listener {
     public function onEnable(): void {
         self::$instance = $this;
 
-        $this->saveDefaultConfig();
-        $this->config = $this->getConfig();
+        @mkdir($this->getDataFolder());
 
-        $this->initStorage();
+        // Load YAML files for fallback
+        $this->perkData = new Config($this->getDataFolder() . "temp_perks.yml", Config::YAML);
+        $this->coinsData = new Config($this->getDataFolder() . "temp_coins.yml", Config::YAML);
+        $this->dailyLimits = new Config($this->getDataFolder() . "daily_limits.yml", Config::YAML);
 
-        // Events
-        $pm = $this->getServer()->getPluginManager();
-        $pm->registerEvents(new EventListener(), $this);
-        $pm->registerEvents(new Protection(), $this);
+        // Attempt MySQL connection
+        $host = "localhost";
+        $user = "root";
+        $pass = "";
+        $dbName = "lobbycore";
+
+        $this->db = @new mysqli($host, $user, $pass, $dbName);
+        if ($this->db && !$this->db->connect_error) {
+            $this->usingMySQL = true;
+            $this->getLogger()->info("Connected to MySQL!");
+        } else {
+            $this->getLogger()->warning("MySQL not available. Using YAML storage.");
+        }
+
+        // Register events
+        $this->getServer()->getPluginManager()->registerEvents(new EventListener(), $this);
+        $this->getServer()->getPluginManager()->registerEvents(new Protection(), $this);
+        $this->getServer()->getPluginManager()->registerEvents($this, $this);
 
         // Commands
-        $this->getServer()->getCommandMap()->register("hub", new HubCommand());
-        $this->getServer()->getCommandMap()->register("item", new ItemCommand());
+        $this->getServer()->getCommandMap()->register("hub", new \LC\commands\HubCommand());
+        $this->getServer()->getCommandMap()->register("item", new \LC\commands\ItemCommand());
 
-        $this->getLogger()->info("LobbyCore enabled");
+        $this->getLogger()->info("LobbyCore Enabled");
     }
 
     public function onDisable(): void {
-        if ($this->db !== null) {
-            $this->db->close();
-        }
-        $this->getLogger()->info("LobbyCore disabled");
+        $this->getLogger()->info("LobbyCore Disabled");
+        $this->perkData->save();
+        $this->coinsData->save();
+        $this->dailyLimits->save();
     }
 
-    /* -------------------- STORAGE -------------------- */
-
-    private function initStorage(): void {
-        $mysql = $this->config->get("mysql");
-
-        if ($mysql["enabled"] === true && $this->connectMysql($mysql)) {
-            $this->provider = new MysqlProvider($this, $this->db);
-            $this->getLogger()->info("Using MySQL storage");
-        } else {
-            $this->provider = new YamlProvider($this);
-            $this->getLogger()->warning("Using YAML storage (testing mode)");
-        }
+    public static function getInstance(): LobbyCore {
+        return self::$instance;
     }
-
-    private function connectMysql(array $cfg): bool {
-        try {
-            $this->db = new mysqli(
-                $cfg["host"],
-                $cfg["user"],
-                $cfg["password"],
-                $cfg["database"],
-                $cfg["port"]
-            );
-
-            if ($this->db->connect_error) {
-                $this->db = null;
-                return false;
-            }
-            return true;
-        } catch (\Throwable) {
-            $this->db = null;
-            return false;
-        }
-    }
-
-    public function getProvider(): DataProvider {
-        return $this->provider;
-    }
-
-    public function getDB(): ?mysqli {
-        return $this->db;
-    }
-
-    /* -------------------- UI -------------------- */
 
     public static function getUI(): UI {
         return new UI();
     }
 
-    /* -------------------- CONFIG HELPERS -------------------- */
+    public function onJoin(PlayerJoinEvent $event): void {
+        $player = $event->getPlayer();
+        UI::applyActivePerks($player);
+    }
 
+    /* =========================
+     * PERK STORAGE METHODS
+     * ========================= */
+    public function getPerksData(Player $player): array {
+        $name = strtolower($player->getName());
+        return $this->perkData->get($name, ["last_spin" => "", "perks" => []]);
+    }
+
+    public function setPerksData(Player $player, array $data): void {
+        $name = strtolower($player->getName());
+        $this->perkData->set($name, $data);
+        $this->perkData->save();
+    }
+
+    /* =========================
+     * COIN STORAGE METHODS
+     * ========================= */
+    public function getCoins(Player $player): int {
+        $name = strtolower($player->getName());
+        return $this->coinsData->get($name, 0);
+    }
+
+    public function setCoins(Player $player, int $amount): void {
+        $name = strtolower($player->getName());
+        $this->coinsData->set($name, $amount);
+        $this->coinsData->save();
+    }
+
+    public function addCoins(Player $player, int $amount): void {
+        $coins = $this->getCoins($player);
+        $this->setCoins($player, $coins + $amount);
+    }
+
+    /* =========================
+     * DAILY LIMITS
+     * ========================= */
+    public function getDailyLimit(Player $player, string $type): int {
+        $name = strtolower($player->getName());
+        $limits = $this->dailyLimits->get($name, []);
+        return $limits[$type] ?? 0;
+    }
+
+    public function setDailyLimit(Player $player, string $type, int $value): void {
+        $name = strtolower($player->getName());
+        $limits = $this->dailyLimits->get($name, []);
+        $limits[$type] = $value;
+        $this->dailyLimits->set($name, $limits);
+        $this->dailyLimits->save();
+    }
+
+    public function resetDailyLimits(): void {
+        foreach ($this->dailyLimits->getAll() as $name => $limits) {
+            foreach ($limits as $type => $value) {
+                $this->dailyLimits->set($name, []);
+            }
+        }
+        $this->dailyLimits->save();
+    }
+
+    /* =========================
+     * LOBBY SPAWN & ITEMS
+     * ========================= */
     public function getLobbySpawn(): Position {
-        $spawn = $this->config->get("lobby")["spawn"];
-        $world = Server::getInstance()->getWorldManager()->getWorldByName($spawn["world"]);
-
-        return new Position(
-            $spawn["x"],
-            $spawn["y"],
-            $spawn["z"],
-            $world,
-            $spawn["yaw"] ?? 0,
-            $spawn["pitch"] ?? 0
-        );
+        $spawn = $this->getConfig()->get("lobby")["spawn"];
+        $world = $this->getServer()->getWorldManager()->getWorldByName($spawn["world"]);
+        return new Position($spawn["x"], $spawn["y"], $spawn["z"], $world, $spawn["yaw"], $spawn["pitch"]);
     }
 
     public function getLobbyItems(): array {
-        return $this->config->get("items", []);
+        return $this->getConfig()->get("items", []);
     }
+
 }
