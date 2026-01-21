@@ -5,6 +5,7 @@ namespace LC;
 use pocketmine\Server;
 use pocketmine\player\Player;
 use pocketmine\plugin\PluginBase;
+use mysqli;
 use pocketmine\event\Listener;
 use pocketmine\utils\Config;
 use pocketmine\world\Position;
@@ -24,12 +25,29 @@ class LobbyCore extends PluginBase implements Listener {
 
     private static LobbyCore $instance;
     private Config $config;
+    private $db;
+
 
     public function onLoad() : void {
         self::$instance = $this;
     }
 
     public function onEnable(): void {
+        self::$instance = $this;
+
+        // Connect to MySQL
+        $host = "localhost";
+        $user = "root";
+        $pass = "";
+        $dbName = "lobbycore";
+
+        $this->db = new mysqli($host, $user, $pass, $dbName);
+        if ($this->db->connect_error) {
+            $this->getLogger()->error("MySQL Connection failed: " . $this->db->connect_error);
+            $this->getServer()->getPluginManager()->disablePlugin($this);
+            return;
+        }
+        $this->getLogger()->info("§aConnected to MySQL!");
         $this->getLogger()->info("§aEnabled LobbyCore");
 
         // Load config.yml
@@ -72,4 +90,13 @@ class LobbyCore extends PluginBase implements Listener {
     public function getLobbyItems() : array {
         return $this->config->get("items");
     }
+
+    public static function getInstance(): LobbyCore {
+        return self::$instance;
+    }
+
+    public function getDB(): mysqli {
+        return $this->db;
+    }
 }
+
