@@ -1,158 +1,239 @@
 <?php
 
-namespace LC;
+namespace LC\ui;
 
-use pocketmine\plugin\PluginBase;
 use pocketmine\player\Player;
-use pocketmine\event\Listener;
-use pocketmine\utils\Config;
-use pocketmine\event\player\PlayerJoinEvent;
-use pocketmine\world\Position;
-use mysqli;
-use LC\ui\UI;
-use LC\event\EventListener;
-use LC\event\Protection;
+use pocketmine\item\VanillaItems;
+use pocketmine\entity\effect\EffectInstance;
+use pocketmine\entity\effect\VanillaEffects;
+use Vecnavium\FormsUI\SimpleForm;
+use LC\LobbyCore;
 
-class LobbyCore extends PluginBase implements Listener {
+class UI {
 
-    private static LobbyCore $instance;
-    private Config $perkData;
-    private Config $coinsData;
-    private Config $dailyLimits;
+    private LobbyCore $plugin;
 
-    private ?mysqli $db = null;
-    private bool $usingMySQL = false;
-
-    public function onLoad(): void {
-        self::$instance = $this;
+    public function __construct() {
+        $this->plugin = LobbyCore::getInstance();
     }
 
-    public function onEnable(): void {
-        self::$instance = $this;
+    /* =========================
+     * SERVER SELECTOR
+     * ========================= */
+    public function getGames(Player $player): void {
+        $form = new SimpleForm(function(Player $player, ?int $data){
+            if($data === null) return;
+            switch($data){
+                case 0: $player->sendMessage("Successfully boarding to Miami, Florida"); break;
+                case 1: $player->sendMessage("Successfully boarding to Tokyo, Japan"); break;
+            }
+        });
 
-        @mkdir($this->getDataFolder());
+        $form->setTitle("Departures");
+        $form->setContent("Select your destination:");
 
-        // Load YAML files for fallback
-        $this->perkData = new Config($this->getDataFolder() . "temp_perks.yml", Config::YAML);
-        $this->coinsData = new Config($this->getDataFolder() . "temp_coins.yml", Config::YAML);
-        $this->dailyLimits = new Config($this->getDataFolder() . "daily_limits.yml", Config::YAML);
+        $form->addButton("Miami");
+        $form->addButton("Tokyo");
 
-        // Attempt MySQL connection
-        $host = "localhost";
-        $user = "root";
-        $pass = "";
-        $dbName = "lobbycore";
+        $player->sendForm($form);
+    }
 
-        $this->db = @new mysqli($host, $user, $pass, $dbName);
-        if ($this->db && !$this->db->connect_error) {
-            $this->usingMySQL = true;
-            $this->getLogger()->info("Connected to MySQL!");
-        } else {
-            $this->getLogger()->warning("MySQL not available. Using YAML storage.");
+    /* =========================
+     * STAFF MENU
+     * ========================= */
+    public function getStaffMenu(Player $player): void {
+        if (!$player->hasPermission("lobbycore.staff")) {
+            $player->sendMessage("No permission.");
+            return;
         }
 
-        // Register events
-        $this->getServer()->getPluginManager()->registerEvents(new EventListener(), $this);
-        $this->getServer()->getPluginManager()->registerEvents(new Protection(), $this);
-        $this->getServer()->getPluginManager()->registerEvents($this, $this);
+        $form = new SimpleForm(function(Player $player, ?int $data){
+            if($data === null) return;
+            $player->sendMessage("Selected option: $data");
+        });
 
-        // Commands
-        $this->getServer()->getCommandMap()->register("hub", new \LC\commands\HubCommand());
-        $this->getServer()->getCommandMap()->register("item", new \LC\commands\ItemCommand());
+        $form->setTitle("Staff Menu");
+        $form->addButton("Manage Players");
+        $form->addButton("Teleport to Event");
+        $form->addButton("Settings");
 
-        $this->getLogger()->info("LobbyCore Enabled");
-    }
-
-    public function onDisable(): void {
-        $this->getLogger()->info("LobbyCore Disabled");
-        $this->perkData->save();
-        $this->coinsData->save();
-        $this->dailyLimits->save();
-    }
-
-    public static function getInstance(): LobbyCore {
-        return self::$instance;
-    }
-
-    public static function getUI(): UI {
-        return new UI();
-    }
-
-    public function onJoin(PlayerJoinEvent $event): void {
-        $player = $event->getPlayer();
-        UI::applyActivePerks($player);
+        $player->sendForm($form);
     }
 
     /* =========================
-     * PERK STORAGE METHODS
+     * COSMETICS MENU
      * ========================= */
-    public function getPerksData(Player $player): array {
-        $name = strtolower($player->getName());
-        return $this->perkData->get($name, ["last_spin" => "", "perks" => []]);
-    }
+    public function getCosmetics(Player $player): void {
+        $form = new SimpleForm(function(Player $player, ?int $data){
+            if($data === null) return;
+            switch($data){
+                case 0: $player->sendMessage("Opening Costumes..."); break;
+                case 1: $player->sendMessage("Opening Trails..."); break;
+                case 2: $player->sendMessage("Opening Titles..."); break;
+                case 3: $player->getServer()->dispatchCommand($player, "pets"); break;
+            }
+        });
 
-    public function setPerksData(Player $player, array $data): void {
-        $name = strtolower($player->getName());
-        $this->perkData->set($name, $data);
-        $this->perkData->save();
+        $form->setTitle("Your Luggage");
+        $form->addButton("Your Costumes");
+        $form->addButton("Your Trails");
+        $form->addButton("Your Titles");
+        $form->addButton("Your Pets");
+
+        $player->sendForm($form);
     }
 
     /* =========================
-     * COIN STORAGE METHODS
+     * ACCESS CARD
      * ========================= */
-    public function getCoins(Player $player): int {
-        $name = strtolower($player->getName());
-        return $this->coinsData->get($name, 0);
-    }
+    public function getAccessCard(Player $player): void {
+        $form = new SimpleForm(function(Player $player, ?int $data){
+            if($data === null) return;
+            switch($data){
+                case 0: $this->getOnlineShop($player, "Costume Boutique"); break;
+                case 1: $this->getOnlineShop($player, "Trail Studio"); break;
+                case 2: $this->getOnlineShop($player, "Pet Emporium"); break;
+                case 3: $this->getInPersonShop($player, "Witchs Hut"); break;
+                case 4: $this->getInPersonShop($player, "Shift & Sip"); break;
+                case 5: $this->getInPersonShop($player, "Skyline Sushi"); break;
+                case 6: $this->getInPersonShop($player, "El Taqueria"); break;
+                case 7: $this->getInPersonShop($player, "Leaderboard Lounge"); break;
+            }
+        });
 
-    public function setCoins(Player $player, int $amount): void {
-        $name = strtolower($player->getName());
-        $this->coinsData->set($name, $amount);
-        $this->coinsData->save();
-    }
+        $form->setTitle("Access Card");
 
-    public function addCoins(Player $player, int $amount): void {
-        $coins = $this->getCoins($player);
-        $this->setCoins($player, $coins + $amount);
+        // For now, image buttons replaced with text
+        $form->addButton("Costume Boutique");
+        $form->addButton("Trail Studio");
+        $form->addButton("Pet Emporium");
+        $form->addButton("Witchs Hut");
+        $form->addButton("Shift & Sip");
+        $form->addButton("Skyline Sushi");
+        $form->addButton("El Taqueria");
+        $form->addButton("Leaderboard Lounge");
+
+        $player->sendForm($form);
     }
 
     /* =========================
-     * DAILY LIMITS
+     * IN-PERSON SHOPS
      * ========================= */
-    public function getDailyLimit(Player $player, string $type): int {
-        $name = strtolower($player->getName());
-        $limits = $this->dailyLimits->get($name, []);
-        return $limits[$type] ?? 0;
+    public function getInPersonShop(Player $player, string $shop): void {
+        $form = new SimpleForm(function(Player $player, ?int $data) use ($shop){
+            if($data === null) return;
+
+            switch($shop){
+                case "Shift & Sip":
+                    $this->giveFood($player, "Coffee");
+                    break;
+                case "Skyline Sushi":
+                    $this->giveFood($player, "Ramen Bowl");
+                    break;
+                case "El Taqueria":
+                    $this->giveFood($player, "Beef Taco");
+                    break;
+                case "Witchs Hut":
+                    $this->spinWitchWheel($player);
+                    break;
+            }
+        });
+
+        $form->setTitle($shop);
+
+        if($shop === "Witchs Hut"){
+            $form->setContent("Spin the wheel for a daily reward");
+            $form->addButton("Spin Wheel");
+        } else {
+            $form->setContent("Receive item");
+            $form->addButton("Receive Item");
+        }
+
+        $player->sendForm($form);
     }
 
-    public function setDailyLimit(Player $player, string $type, int $value): void {
-        $name = strtolower($player->getName());
-        $limits = $this->dailyLimits->get($name, []);
-        $limits[$type] = $value;
-        $this->dailyLimits->set($name, $limits);
-        $this->dailyLimits->save();
+    /* =========================
+     * FOOD GIVER
+     * ========================= */
+    private function giveFood(Player $player, string $name): void {
+        $item = VanillaItems::BREAD();
+        $item->setCustomName($name);
+        $player->getInventory()->addItem($item);
+        $player->sendMessage("You received $name!");
     }
 
-    public function resetDailyLimits(): void {
-        foreach ($this->dailyLimits->getAll() as $name => $limits) {
-            foreach ($limits as $type => $value) {
-                $this->dailyLimits->set($name, []);
+    /* =========================
+     * WITCH WHEEL
+     * ========================= */
+    private function spinWitchWheel(Player $player): void {
+        $core = LobbyCore::getInstance();
+        $name = strtolower($player->getName());
+        $today = date("Y-m-d");
+
+        $data = $core->getPerksData($player);
+
+        if(($data["last_spin"] ?? "") === $today){
+            $player->sendMessage("You already spun the wheel today.");
+            return;
+        }
+
+        $data["last_spin"] = $today;
+        $roll = mt_rand(1,100);
+        $now = time();
+
+        if($roll <= 60){
+            $expires = $now + 3600;
+            $data["perks"]["speed"] = $expires;
+            $player->sendMessage("Speed boost unlocked for 1 hour!");
+        } elseif($roll <= 85){
+            $expires = $now + 86400;
+            $data["perks"]["temp_cosmetic"] = $expires;
+            $player->sendMessage("Temporary cosmetic unlocked for today!");
+        } else {
+            $expires = $now + 86400;
+            $data["perks"]["temp_pet"] = $expires;
+            $player->sendMessage("Temporary pet access unlocked for today!");
+        }
+
+        $core->setPerksData($player, $data);
+        $this->applyActivePerks($player);
+    }
+
+    public function applyActivePerks(Player $player): void {
+        $core = LobbyCore::getInstance();
+        $data = $core->getPerksData($player);
+        if(empty($data["perks"])) return;
+
+        $now = time();
+        $changed = false;
+
+        foreach($data["perks"] as $perk => $expires){
+            if($expires <= $now){
+                unset($data["perks"][$perk]);
+                $changed = true;
+                continue;
+            }
+
+            switch($perk){
+                case "speed":
+                    $player->getEffects()->add(new EffectInstance(VanillaEffects::SPEED(), 20*60, 1));
+                    break;
+                case "temp_pet":
+                case "temp_cosmetic":
+                    // Hook into pet/cosmetic system later
+                    break;
             }
         }
-        $this->dailyLimits->save();
+
+        if($changed){
+            $core->setPerksData($player, $data);
+        }
     }
 
     /* =========================
-     * LOBBY SPAWN & ITEMS
+     * ONLINE SHOPS
      * ========================= */
-    public function getLobbySpawn(): Position {
-        $spawn = $this->getConfig()->get("lobby")["spawn"];
-        $world = $this->getServer()->getWorldManager()->getWorldByName($spawn["world"]);
-        return new Position($spawn["x"], $spawn["y"], $spawn["z"], $world, $spawn["yaw"], $spawn["pitch"]);
+    private function getOnlineShop(Player $player, string $name): void {
+        $player->sendMessage("$name coming soon!");
     }
-
-    public function getLobbyItems(): array {
-        return $this->getConfig()->get("items", []);
-    }
-
 }
