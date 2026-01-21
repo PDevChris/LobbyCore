@@ -8,6 +8,7 @@ use pocketmine\plugin\PluginBase;
 use mysqli;
 use pocketmine\event\Listener;
 use pocketmine\utils\Config;
+use pocketmine\event\player\PlayerJoinEvent;
 use pocketmine\world\Position;
 
 //Events
@@ -95,8 +96,13 @@ class LobbyCore extends PluginBase implements Listener {
         return self::$instance;
     }
 
+    public function onJoin(PlayerJoinEvent $event): void {
+    LobbyCore::getInstance()->getUI()->applyActivePerks($event->getPlayer());
+}
+
     public function getDB(): mysqli {
         return $this->db;
     }
 }
+
 
